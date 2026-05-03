@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RepoRadar — Find GitHub Repos in Plain English</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #7fff6e;
+    --accent2: #4effd0;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --card: #13131c;
+    --glow: rgba(127,255,110,0.12);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position: fixed;
+    inset:0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.35;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    z-index:1;
+    text-align: center;
+    padding: 64px 24px 40px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0d1a0d;
+    border: 1px solid #1e3a1e;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 5px 14px;
+    border-radius: 999px;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+  .badge-dot { width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: clamp(3rem, 7vw, 5.6rem);
+    font-weight: 700;
+    line-height: 1.0;
+    letter-spacing: 0.01em;
+    margin-bottom: 16px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 460px;
+    margin: 0 auto 40px;
+    line-height: 1.65;
+  }
+  .free-pill {
+    display:inline-block;
+    background:#0d1a0d;
+    border:1px solid #1e3a1e;
+    color:var(--accent);
+    font-family:'DM Mono',monospace;
+    font-size:0.7rem;
+    padding:2px 8px;
+    border-radius:4px;
+    margin-left:6px;
+    vertical-align:middle;
+    letter-spacing:0.05em;
+  }
+
+  /* ── SEARCH ── */
+  .search-wrap {
+    position: relative;
+    max-width: 700px;
+    margin: 0 auto;
+    z-index: 2;
+  }
+  .search-glow {
+    position:absolute;
+    inset:-1px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index:-1;
+    border-radius:18px;
+  }
+  .search-wrap:focus-within .search-glow { opacity:1; }
+  .search-inner {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 6px 6px 6px 20px;
+    gap: 10px;
+  }
+  .search-wrap:focus-within .search-inner { border-color: transparent; }
+  #searchInput {
+    flex:1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    padding: 10px 0;
+  }
+  #searchInput::placeholder { color: var(--muted); }
+  #searchBtn {
+    background: var(--accent);
+    color: #09090f;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    padding: 13px 26px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #searchBtn:hover { transform: translateY(-1px); box-shadow: 0 0 28px var(--glow); }
+  #searchBtn:active { transform: translateY(0); }
+  #searchBtn:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.78rem;
+    padding: 5px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    font-family: 'DM Mono', monospace;
+  }
+  .chip:hover { color: var(--accent); border-color: var(--accent); background:#0d1a0d; }
+
+  /* ── HOW IT WORKS ── */
+  .how {
+    position:relative;z-index:1;
+    display:flex;gap:20px;flex-wrap:wrap;justify-content:center;
+    max-width:680px;margin:0 auto 0;padding:0 20px;
+    margin-top: 40px;
+  }
+  .how-step {
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:16px 20px;flex:1;min-width:160px;
+    text-align:center;
+  }
+  .how-icon { font-size:1.4rem;margin-bottom:8px; }
+  .how-title { font-family:'Barlow Condensed',sans-serif;font-size:0.85rem;font-weight:700;margin-bottom:4px; }
+  .how-desc { color:var(--muted);font-size:0.75rem;line-height:1.5; }
+
+  /* ── RESULTS ── */
+  #results {
+    position: relative;
+    z-index:1;
+    max-width: 800px;
+    margin: 48px auto 100px;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .results-header {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .results-header span { color: var(--accent); }
+
+  .status-msg {
+    text-align: center;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    padding: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .spinner {
+    width:16px;height:16px;
+    border:2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;flex-shrink:0;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .repo-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 28px;
+    position: relative;
+    overflow: hidden;
+    animation: slideUp 0.45s ease both;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+  .repo-card:hover {
+    border-color: #2a2a40;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .repo-card::before {
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    opacity:0;transition:opacity 0.2s;
+  }
+  .repo-card:hover::before { opacity:1; }
+  @keyframes slideUp {
+    from{opacity:0;transform:translateY(18px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  .repo-card:nth-child(2){animation-delay:0.06s}
+  .repo-card:nth-child(3){animation-delay:0.12s}
+  .repo-card:nth-child(4){animation-delay:0.18s}
+  .repo-card:nth-child(5){animation-delay:0.24s}
+  .repo-card:nth-child(6){animation-delay:0.3s}
+
+  .repo-rank {
+    font-family:'DM Mono',monospace;font-size:0.68rem;
+    color:var(--accent);letter-spacing:0.1em;margin-bottom:10px;opacity:0.6;
+  }
+  .repo-name {
+    font-family:'Barlow Condensed',sans-serif;font-size:1.35rem;font-weight:600;letter-spacing:0.02em;
+    margin-bottom:8px;
+  }
+  .repo-name a { color:var(--text);text-decoration:none;transition:color 0.2s; }
+  .repo-name a:hover { color:var(--accent); }
+  .repo-name .repo-owner { color:var(--muted);font-weight:400; }
+
+  .repo-desc {
+    color:#a0a0bc;font-size:0.92rem;line-height:1.65;
+    margin-bottom:14px;
+  }
+  .repo-desc.empty { color:var(--muted);font-style:italic;font-size:0.85rem; }
+
+  .repo-meta {
+    display:flex;flex-wrap:wrap;gap:14px;margin-bottom:16px;
+    font-family:'DM Mono',monospace;font-size:0.76rem;color:var(--muted);
+  }
+  .meta-item { display:flex;align-items:center;gap:5px; }
+  .lang-dot { width:9px;height:9px;border-radius:50%;display:inline-block; }
+
+  .topics {
+    display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;
+  }
+  .topic {
+    background:#0d1520;border:1px solid #1a2a3a;
+    color:#6ab0d4;font-family:'DM Mono',monospace;font-size:0.7rem;
+    padding:3px 10px;border-radius:5px;
+  }
+
+  .repo-footer {
+    padding-top:14px;border-top:1px solid var(--border);
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  }
+  .btn-primary {
+    font-family:'DM Mono',monospace;font-size:0.78rem;
+    color:#09090f;background:var(--accent);
+    border:1px solid var(--accent);border-radius:8px;
+    padding:8px 16px;cursor:pointer;text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:box-shadow 0.2s;font-weight:600;
+  }
+  .btn-primary:hover { box-shadow:0 0 20px var(--glow); }
+  .btn-ghost {
+    font-family:'DM Mono',monospace;font-size:0.78rem;
+    color:var(--muted);background:none;
+    border:1px solid var(--border);border-radius:8px;
+    padding:8px 14px;cursor:pointer;text-decoration:none;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:color 0.2s,border-color 0.2s;
+  }
+  .btn-ghost:hover { color:var(--accent);border-color:var(--accent); }
+
+  .error-card {
+    background:#1a0d0d;border:1px solid #3a1a1a;border-radius:12px;
+    padding:20px 24px;color:#ff8080;font-size:0.88rem;
+    font-family:'DM Mono',monospace;text-align:center;line-height:1.6;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    position:relative;z-index:1;
+    text-align:center;padding:0 20px 48px;
+    color:var(--muted);font-size:0.78rem;font-family:'DM Mono',monospace;
+  }
+  .footer a { color:var(--muted);text-decoration:none; }
+  .footer a:hover { color:var(--accent); }
+
+  /* ── DEPLOY GUIDE ── */
+  .deploy-section {
+    position:relative;z-index:1;
+    max-width:680px;margin:0 auto 60px;padding:0 20px;
+  }
+  .deploy-title {
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;
+    margin-bottom:14px;color:var(--muted);text-align:center;
+    letter-spacing:0.03em;
+  }
+  .deploy-steps {
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;padding:20px 24px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .deploy-step {
+    display:flex;gap:14px;align-items:flex-start;
+    font-size:0.85rem;line-height:1.5;
+  }
+  .step-num {
+    background:var(--border);color:var(--accent);
+    font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;
+    width:22px;height:22px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    margin-top:1px;
+  }
+  .step-text { color:#a0a0bc; }
+  .step-text code {
+    background:var(--border);color:var(--accent2);
+    font-family:'DM Mono',monospace;font-size:0.78rem;
+    padding:1px 6px;border-radius:4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="badge"><span class="badge-dot"></span> 100% Free · No API Key · No Server</div>
+  <h1>Search GitHub<br>in <span>plain English</span></h1>
+  <p class="subtitle">
+    No technical keywords needed. Just describe what you want — we find the best repos and summarize them for you.
+    <span class="free-pill">FREE</span>
+  </p>
+
+  <div class="search-wrap">
+    <div class="search-glow"></div>
+    <div class="search-inner">
+      <input id="searchInput" type="text"
+        placeholder="e.g. tool to remove background from images automatically"
+        autocomplete="off" />
+      <button id="searchBtn" onclick="doSearch()">Search →</button>
+    </div>
+  </div>
+
+  <div class="examples">
+    <span class="chip" onclick="quickSearch(this)">send emails with Python</span>
+    <span class="chip" onclick="quickSearch(this)">detect objects in photos</span>
+    <span class="chip" onclick="quickSearch(this)">build a fast REST API</span>
+    <span class="chip" onclick="quickSearch(this)">learn machine learning</span>
+    <span class="chip" onclick="quickSearch(this)">make charts in JavaScript</span>
+    <span class="chip" onclick="quickSearch(this)">scrape websites easily</span>
+  </div>
+</div>
+
+<!-- How it works -->
+<div class="how">
+  <div class="how-step">
+    <div class="how-icon">✍️</div>
+    <div class="how-title">Type in English</div>
+    <div class="how-desc">Describe what you need in plain words — no GitHub jargon</div>
+  </div>
+  <div class="how-step">
+    <div class="how-icon">🔍</div>
+    <div class="how-title">Smart Keywords</div>
+    <div class="how-desc">We convert your words to optimized GitHub search terms</div>
+  </div>
+  <div class="how-step">
+    <div class="how-icon">⭐</div>
+    <div class="how-title">Top 5 Results</div>
+    <div class="how-desc">Best repos ranked by stars with full details & quick actions</div>
+  </div>
+</div>
+
+<div id="results"></div>
+
+<!-- Deploy guide -->
+<div class="deploy-section">
+  <div class="deploy-title">🚀 Deploy this for FREE in 3 steps</div>
+  <div class="deploy-steps">
+    <div class="deploy-step">
+      <div class="step-num">1</div>
+      <div class="step-text">Create a free GitHub account at <code>github.com</code> and make a new repository named <code>reporadar</code></div>
+    </div>
+    <div class="deploy-step">
+      <div class="step-num">2</div>
+      <div class="step-text">Upload this HTML file, rename it to <code>index.html</code>, and push it to your repo</div>
+    </div>
+    <div class="deploy-step">
+      <div class="step-num">3</div>
+      <div class="step-text">Go to Settings → Pages → Source: <code>main branch</code> → Save. Your site is live at <code>yourusername.github.io/reporadar</code> 🎉</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Built with GitHub Public API · Zero cost · <a href="https://github.com" target="_blank">github.com</a>
+</div>
+
+<script>
+// ── Natural language → GitHub keywords mapping ──
+// Pure JS, no API needed. Maps common phrases to GitHub search terms.
+const KEYWORD_MAP = [
+  // Images & Vision
+  { patterns: ['remove background','background remov','transparent background'], keywords: 'background removal image python' },
+  { patterns: ['detect object','object detection','recognize object'], keywords: 'object detection deep learning yolo' },
+  { patterns: ['face detect','detect face','face recogni'], keywords: 'face detection recognition opencv' },
+  { patterns: ['image classif','classify image'], keywords: 'image classification neural network' },
+  { patterns: ['ocr','read text from image','text recognition'], keywords: 'ocr text recognition python' },
+  { patterns: ['image compress','compress image'], keywords: 'image compression optimization' },
+  { patterns: ['image resize','resize image'], keywords: 'image processing resize python' },
+  { patterns: ['generate image','image generat','ai image'], keywords: 'ai image generation stable diffusion' },
+
+  // Web & APIs
+  { patterns: ['scrape website','web scraping','scrape web','extract data from website'], keywords: 'web scraping python beautifulsoup scrapy' },
+  { patterns: ['rest api','build api','create api','make api'], keywords: 'rest api framework backend' },
+  { patterns: ['graphql'], keywords: 'graphql api server client' },
+  { patterns: ['websocket','real time','realtime'], keywords: 'websocket realtime server' },
+  { patterns: ['download youtube','youtube download','video download'], keywords: 'youtube downloader video python' },
+  { patterns: ['http request','make request','fetch data'], keywords: 'http client requests library' },
+
+  // Data & ML
+  { patterns: ['machine learning','learn ml','ml algorithm'], keywords: 'machine learning tutorial python scikit' },
+  { patterns: ['deep learning','neural network','neural net'], keywords: 'deep learning pytorch tensorflow' },
+  { patterns: ['data analysis','analyse data','analyze data'], keywords: 'data analysis pandas visualization python' },
+  { patterns: ['chart','graph','visuali','plot data'], keywords: 'data visualization charts javascript python' },
+  { patterns: ['csv','spreadsheet','excel data'], keywords: 'csv excel data processing python' },
+  { patterns: ['database','store data','sql'], keywords: 'database orm sql python' },
+  { patterns: ['chatbot','chat bot','ai chat'], keywords: 'chatbot nlp conversational ai' },
+  { patterns: ['sentiment','emotion text','text classif'], keywords: 'sentiment analysis nlp python' },
+
+  // Email & Communication
+  { patterns: ['send email','email send','smtp','mail send'], keywords: 'send email python smtp automation' },
+  { patterns: ['email template','html email'], keywords: 'email template html generator' },
+  { patterns: ['notification','push notif'], keywords: 'push notification service' },
+  { patterns: ['sms','text message','send sms'], keywords: 'sms sending twilio python' },
+  { patterns: ['slack bot','discord bot','telegram bot'], keywords: 'discord bot python automation' },
+
+  // Auth & Security
+  { patterns: ['login','authentication','auth system','sign in','user auth'], keywords: 'authentication jwt oauth login' },
+  { patterns: ['password','encrypt','secure'], keywords: 'password encryption security library' },
+  { patterns: ['two factor','2fa','otp'], keywords: 'two factor authentication otp' },
+
+  // Mobile & Desktop
+  { patterns: ['mobile app','react native','android ios'], keywords: 'cross platform mobile app react native' },
+  { patterns: ['desktop app','desktop application'], keywords: 'desktop app electron tauri' },
+  { patterns: ['ios app','swift app'], keywords: 'ios swift app framework' },
+  { patterns: ['android app','kotlin app'], keywords: 'android kotlin app framework' },
+
+  // Frontend
+  { patterns: ['javascript chart','js chart','chart js'], keywords: 'javascript charts visualization library' },
+  { patterns: ['css animation','animate css'], keywords: 'css animation library framework' },
+  { patterns: ['drag drop','drag and drop'], keywords: 'drag and drop javascript library' },
+  { patterns: ['form validation','validate form'], keywords: 'form validation javascript library' },
+  { patterns: ['markdown editor','rich text'], keywords: 'markdown editor rich text javascript' },
+  { patterns: ['date picker','calendar ui'], keywords: 'date picker calendar component' },
+
+  // DevOps & Tools
+  { patterns: ['docker','container','containerize'], keywords: 'docker container deployment' },
+  { patterns: ['ci cd','continuous integration','deploy automat'], keywords: 'ci cd pipeline automation github actions' },
+  { patterns: ['monitor','performance monitor','server monitor'], keywords: 'server monitoring performance dashboard' },
+  { patterns: ['log','logging','debug log'], keywords: 'logging library debug python javascript' },
+  { patterns: ['test','unit test','testing'], keywords: 'testing framework unit test' },
+  { patterns: ['cli','command line tool','terminal tool'], keywords: 'cli tool command line python' },
+  { patterns: ['cron','scheduled task','schedule job'], keywords: 'cron job scheduler task automation' },
+
+  // Payments & Business
+  { patterns: ['payment','stripe','checkout','billing'], keywords: 'payment integration stripe checkout' },
+  { patterns: ['ecommerce','online store','shop'], keywords: 'ecommerce store platform' },
+  { patterns: ['invoice','generate invoice'], keywords: 'invoice generator pdf business' },
+  { patterns: ['pdf','generate pdf','create pdf'], keywords: 'pdf generation library python' },
+
+  // Specific languages
+  { patterns: ['python fast','fast python','python web'], keywords: 'python web framework fastapi flask' },
+  { patterns: ['golang','go lang','go http'], keywords: 'golang web framework rest' },
+  { patterns: ['rust web','rust server'], keywords: 'rust web framework server' },
+  { patterns: ['nodejs','node js','node server'], keywords: 'nodejs express server framework' },
+];
+
+function naturalToKeywords(query) {
+  const lower = query.toLowerCase();
+
+  // Check keyword map first
+  for (const entry of KEYWORD_MAP) {
+    for (const p of entry.patterns) {
+      if (lower.includes(p)) return entry.keywords;
+    }
+  }
+
+  // Smart fallback: clean up the query
+  const stopWords = new Set([
+    'a','an','the','to','for','with','that','this','how','can','i','we',
+    'you','me','my','build','make','create','get','use','using','want',
+    'need','find','tool','app','something','easily','quickly','simple',
+    'automatic','automatically','way','good','best','and','or','of','in',
+    'it','is','are','be','do','does','would','could','should','have',
+    'help','please','show','display','let','from','into'
+  ]);
+
+  const words = lower
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+
+  // Deduplicate and take top 5 most meaningful words
+  const unique = [...new Set(words)].slice(0, 5);
+  return unique.join(' ') || query;
+}
+
+function quickSearch(el) {
+  document.getElementById('searchInput').value = el.textContent;
+  doSearch();
+}
+
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+async function doSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+
+  const results = document.getElementById('results');
+  const keywords = naturalToKeywords(query);
+
+  results.innerHTML = `<div class="status-msg"><div class="spinner"></div> Searching for "${keywords}"…</div>`;
+
+  try {
+    const encoded = encodeURIComponent(keywords);
+    const res = await fetch(
+      `https://api.github.com/search/repositories?q=${encoded}&sort=stars&order=desc&per_page=5`,
+      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+    );
+
+    if (res.status === 403) {
+      results.innerHTML = `<div class="error-card">⚠️ GitHub rate limit reached. Please wait 60 seconds and try again.<br><small style="opacity:0.6;margin-top:6px;display:block">GitHub allows 10 searches/min without an account.</small></div>`;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data.items || data.items.length === 0) {
+      results.innerHTML = `<div class="error-card">No repositories found for "${query}".<br><small style="opacity:0.6;margin-top:6px;display:block">Try different words or be more specific.</small></div>`;
+      return;
+    }
+
+    const repos = data.items.slice(0, 5);
+    results.innerHTML = `<div class="results-header">Top <span>${repos.length}</span> repositories for "<span style="color:var(--text)">${query}</span>" &nbsp;·&nbsp; searched as: <span>"${keywords}"</span></div>`;
+
+    repos.forEach((repo, i) => renderCard(repo, i));
+
+  } catch (err) {
+    results.innerHTML = `<div class="error-card">Network error: ${err.message}<br><small style="opacity:0.6">Check your internet connection.</small></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search →';
+  }
+}
+
+function renderCard(repo, i) {
+  const results = document.getElementById('results');
+  const card = document.createElement('div');
+  card.className = 'repo-card';
+
+  const stars  = fmt(repo.stargazers_count);
+  const forks  = fmt(repo.forks_count);
+  const issues = fmt(repo.open_issues_count);
+  const lang   = repo.language || null;
+  const updated = timeAgo(repo.updated_at);
+  const created = new Date(repo.created_at).getFullYear();
+  const desc   = repo.description;
+  const topics = (repo.topics || []).slice(0, 5);
+  const owner  = repo.owner?.login || '';
+  const name   = repo.name;
+  const license = repo.license?.spdx_id || null;
+
+  // Build a richer summary from available data
+  const summary = buildSummary(repo);
+
+  card.innerHTML = `
+    <div class="repo-rank">RESULT #${i+1} OF 5</div>
+
+    <div class="repo-name">
+      <a href="${repo.html_url}" target="_blank" rel="noopener">
+        <span class="repo-owner">${owner} / </span>${name}
+      </a>
+    </div>
+
+    <div class="repo-desc ${desc ? '' : 'empty'}">
+      ${desc ? escHtml(desc) : 'No description provided by the author.'}
+    </div>
+
+    ${topics.length ? `
+    <div class="topics">
+      ${topics.map(t => `<span class="topic">${escHtml(t)}</span>`).join('')}
+    </div>` : ''}
+
+    <div class="repo-meta">
+      ${lang ? `<span class="meta-item"><span class="lang-dot" style="background:${langColor(lang)}"></span>${lang}</span>` : ''}
+      <span class="meta-item">★ ${stars} stars</span>
+      <span class="meta-item">⑂ ${forks} forks</span>
+      <span class="meta-item">🐛 ${issues} issues</span>
+      <span class="meta-item">📅 ${updated}</span>
+      <span class="meta-item">🗓 Since ${created}</span>
+      ${license ? `<span class="meta-item">📄 ${license}</span>` : ''}
+    </div>
+
+    <div style="background:#0d0d16;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:0">
+      <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--accent);letter-spacing:0.1em;margin-bottom:8px;opacity:0.7">QUICK SUMMARY</div>
+      <div style="color:#a8a8c4;font-size:0.88rem;line-height:1.7">${summary}</div>
+    </div>
+
+    <div class="repo-footer">
+      <a class="btn-primary" href="${repo.html_url}" target="_blank" rel="noopener">↗ View on GitHub</a>
+      <button class="btn-ghost" onclick="copyText('git clone ${repo.clone_url}', this)">⎘ Copy clone</button>
+      <a class="btn-ghost" href="${repo.html_url}/archive/refs/heads/${repo.default_branch || 'main'}.zip">⬇ Download ZIP</a>
+      ${repo.homepage ? `<a class="btn-ghost" href="${escAttr(repo.homepage)}" target="_blank" rel="noopener">🌐 Website</a>` : ''}
+    </div>
+  `;
+
+  results.appendChild(card);
+}
+
+function buildSummary(repo) {
+  const parts = [];
+  const name = repo.name;
+  const owner = repo.owner?.login;
+  const stars = repo.stargazers_count;
+  const lang = repo.language;
+  const topics = repo.topics || [];
+  const forks = repo.forks_count;
+  const desc = repo.description;
+
+  // Sentence 1: What it is
+  if (desc) {
+    parts.push(`<strong>${name}</strong> by ${owner} — ${escHtml(desc)}`);
+  } else {
+    parts.push(`<strong>${name}</strong> is a repository by <strong>${owner}</strong>.`);
+  }
+
+  // Sentence 2: Popularity signal
+  if (stars >= 50000) {
+    parts.push(`It is one of the most starred projects on GitHub with over ${fmt(stars)} stars, indicating massive community trust and adoption.`);
+  } else if (stars >= 10000) {
+    parts.push(`With ${fmt(stars)} stars and ${fmt(forks)} forks, it is widely used and battle-tested by thousands of developers.`);
+  } else if (stars >= 1000) {
+    parts.push(`It has earned ${fmt(stars)} stars and ${fmt(forks)} forks, showing solid community adoption.`);
+  } else {
+    parts.push(`It has ${fmt(stars)} stars${forks > 0 ? ` and ${fmt(forks)} forks` : ''}.`);
+  }
+
+  // Sentence 3: Language / topics context
+  if (lang && topics.length > 0) {
+    parts.push(`Written in <strong>${lang}</strong>, it covers topics like ${topics.slice(0,3).map(t=>`<em>${t}</em>`).join(', ')}.`);
+  } else if (lang) {
+    parts.push(`The project is written in <strong>${lang}</strong>.`);
+  } else if (topics.length > 0) {
+    parts.push(`Key topics include ${topics.slice(0,4).map(t=>`<em>${t}</em>`).join(', ')}.`);
+  }
+
+  // Sentence 4: Activity signal
+  const daysSince = Math.floor((Date.now() - new Date(repo.updated_at)) / 86400000);
+  if (daysSince <= 7) {
+    parts.push(`🟢 Actively maintained — last updated just ${daysSince <= 1 ? 'today' : daysSince + ' days ago'}.`);
+  } else if (daysSince <= 60) {
+    parts.push(`🟡 Recently active, updated ${timeAgo(repo.updated_at)}.`);
+  } else if (daysSince <= 365) {
+    parts.push(`🟠 Last updated ${timeAgo(repo.updated_at)} — may still be stable and production-ready.`);
+  } else {
+    parts.push(`⚪ Last updated ${timeAgo(repo.updated_at)} — check if it's still maintained before using.`);
+  }
+
+  return parts.join(' ');
+}
+
+function fmt(n) {
+  if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'k';
+  return String(n);
+}
+
+function timeAgo(dateStr) {
+  const d = Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 30) return `${d} days ago`;
+  if (d < 365) return `${Math.floor(d/30)} months ago`;
+  return `${Math.floor(d/365)} year${Math.floor(d/365)>1?'s':''} ago`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return escHtml(s); }
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }).catch(() => {
+    btn.textContent = 'Use Ctrl+C';
+    setTimeout(() => btn.textContent = '⎘ Copy clone', 2000);
+  });
+}
+
+function langColor(lang) {
+  const map = {
+    JavaScript:'#f7df1e',TypeScript:'#3178c6',Python:'#3572A5',
+    Rust:'#dea584',Go:'#00ADD8',Java:'#b07219','C++':'#f34b7d',
+    C:'#aaaaaa',Ruby:'#701516',Swift:'#F05138',Kotlin:'#A97BFF',
+    HTML:'#e34c26',CSS:'#563d7c',Shell:'#89e051',Dart:'#00B4AB',
+    'C#':'#239120',PHP:'#777BB4',Scala:'#c22d40',Elixir:'#6e4a7e',
+    Haskell:'#5e5086',R:'#198CE7',Vue:'#41b883',Svelte:'#ff3e00',
+    Lua:'#000080',Zig:'#ec915c',Nim:'#ffc200',
+  };
+  return map[lang] || '#4effd0';
+}
+</script>
+</body>
+</html>
